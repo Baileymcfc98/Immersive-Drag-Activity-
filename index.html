@@ -262,8 +262,8 @@ body.run-mode #liveQuickTools{
     .resizeHandle,.rotateHandle,.moveHandle{position:absolute;width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #111827;pointer-events:auto;touch-action:none}
     .resizeHandle.nw{left:-14px;top:-14px;cursor:nwse-resize}.resizeHandle.ne{right:-14px;top:-14px;cursor:nesw-resize}.resizeHandle.sw{left:-14px;bottom:-14px;cursor:nesw-resize}.resizeHandle.se{right:-14px;bottom:-14px;cursor:nwse-resize}
     .rotateHandle{top:-40px;left:50%;transform:translateX(-50%);background:#7dd3fc;cursor:grab}.rotateLine{position:absolute;width:3px;height:26px;background:#fff;top:-26px;left:50%;transform:translateX(-50%);pointer-events:none}
-    .moveHandle{width:40px;height:40px;top:8px;left:8px;background:rgba(255,255,255,.96);border:none;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 10px rgba(0,0,0,.25);cursor:grab;z-index:12}
-    .item:not(.selected):not(.multi) .moveHandle{opacity:.82}
+    .moveHandle{display:none !important}
+    .item:not(.selected):not(.multi) .moveHandle{display:none !important}
 
     #floatingToolbar{position:absolute;z-index:999;display:none;gap:6px;padding:8px;border-radius:14px;background:rgba(14,20,30,.96);border:1px solid rgba(255,255,255,.08);box-shadow:0 14px 28px rgba(0,0,0,.3);backdrop-filter:blur(8px)}
     #floatingToolbar.visible{display:flex;align-items:center}
@@ -522,6 +522,7 @@ body.run-mode #liveQuickTools{
     const bgImageUrlBtn = document.getElementById('bgImageUrlBtn');
     const bgVideoUrlBtn = document.getElementById('bgVideoUrlBtn');
 
+    const projectControls = document.getElementById('projectControls');
     const projectMenuBtn = document.getElementById('projectMenuBtn');
     const projectMenu = document.getElementById('projectMenu');
     const scenePanel = document.getElementById('scenePanel');
@@ -1236,7 +1237,21 @@ function setAppMode(mode){
         draggedItem.addEventListener('pointermove',move); draggedItem.addEventListener('pointerup',end); draggedItem.addEventListener('pointercancel',end);
       }
       moveHandle?.addEventListener('pointerdown', e=>{ e.stopPropagation(); e.preventDefault(); startItemDrag(e,item); });
-      shell.addEventListener('pointerdown', e=>{ if(e.target.closest('.resizeHandle,.rotateHandle,.moveHandle,.widgetMiniBtn,.widgetActionBtn,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.questionOptionBtn,.mediaFrame,.mediaVideo,.mediaOpenLink')) return; if(item.dataset.locked==='true') return; if(currentTool!=='move') return; if (e.shiftKey || e.metaKey || e.ctrlKey) { selectItem(item, true); e.preventDefault(); return; } selectItem(item); });
+      shell.addEventListener('pointerdown', e=>{
+        const hardBlocked = e.target.closest('.resizeHandle,.rotateHandle,.moveHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink');
+        const buildTouchDrag = appMode==='build';
+        const liveInteractive = appMode==='live' && e.target.closest('.widgetMiniBtn,.widgetActionBtn,.questionOptionBtn,.mediaFrame,.mediaVideo,.mediaOpenLink');
+        if(hardBlocked) return;
+        if(liveInteractive) return;
+        if(item.dataset.locked==='true') return;
+        if(currentTool!=='move') return;
+        if (e.shiftKey || e.metaKey || e.ctrlKey) { selectItem(item, true); e.preventDefault(); return; }
+        selectItem(item);
+        if(buildTouchDrag){
+          e.preventDefault();
+          startItemDrag(e,item);
+        }
+      });
       shell.addEventListener('dblclick', e=>{ e.stopPropagation(); if(item.dataset.type==='question') openQuestionEditorForItem(item); if(item.dataset.type==='text') item.querySelector('.textBoxArea')?.focus(); });
 
       item.querySelectorAll('.resizeHandle').forEach(handle=>{ handle.addEventListener('pointerdown', e=>{ if(item.dataset.locked==='true') return; e.stopPropagation(); e.preventDefault(); selectItem(item); const startX=e.clientX,startY=e.clientY,startWidth=getItemWidth(item),startRotation=parseFloat(item.dataset.rotation||'0'); const signX=handle.classList.contains('nw')||handle.classList.contains('sw')?-1:1; const signY=handle.classList.contains('nw')||handle.classList.contains('ne')?-1:1; const factor=(signX+signY)/2||1; handle.setPointerCapture(e.pointerId); function move(ev){ const dx=ev.clientX-startX, dy=ev.clientY-startY; let delta=(dx*signX+dy*signY)*0.8*factor; let newW=Math.max(60,startWidth+delta); if(snapEnabled) newW=snapValue(newW); item.dataset.width=String(newW); item.dataset.rotation=String(startRotation); applyItemBox(item); repositionFloatingToolbar(); updatePropertiesPanelPosition(); updateSpotlight(); } function end(){ handle.removeEventListener('pointermove',move); handle.removeEventListener('pointerup',end); handle.removeEventListener('pointercancel',end); pushHistory('Item resized'); scheduleAutosave(); refreshLayersPanel(); } handle.addEventListener('pointermove',move); handle.addEventListener('pointerup',end); handle.addEventListener('pointercancel',end); }); });
