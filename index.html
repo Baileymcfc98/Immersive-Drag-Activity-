@@ -1222,6 +1222,10 @@ function setAppMode(mode){
 
     function wireItemInteractions(item){
       const shell=item.querySelector('.dragShell');
+      function getPoint(ev){
+  const p = (ev.touches && ev.touches[0]) || (ev.changedTouches && ev.changedTouches[0]) || ev;
+  return { clientX:p.clientX, clientY:p.clientY };
+}
       function startItemDrag(e){
         if (item.dataset.locked === 'true') return;
         if (currentTool !== 'move') return;
@@ -1230,12 +1234,14 @@ function setAppMode(mode){
         const stageRect = stage.getBoundingClientRect();
         const movingItems = selectedItems.size > 1 && selectedItems.has(item) ? Array.from(selectedItems) : [item];
         const starts = movingItems.map(it=>({it,left:parseFloat(it.style.left),top:parseFloat(it.style.top)}));
-        const startX = e.clientX, startY = e.clientY;
+        const start = getPoint(e);
+const startX = start.clientX, startY = start.clientY;
 
         try { shell.setPointerCapture(e.pointerId); } catch {}
 
         function move(ev){
-          const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      const point = getPoint(ev);
+const dx = point.clientX - startX, dy = point.clientY - startY;
           starts.forEach(({it,left,top})=>{
             let x = left + dx, y = top + dy;
             if(snapEnabled){ x = snapValue(x); y = snapValue(y); }
