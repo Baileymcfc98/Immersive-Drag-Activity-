@@ -1259,18 +1259,24 @@ const dx = point.clientX - startX, dy = point.clientY - startY;
             deselectItem();
           }
           cloneBin.classList.remove('active');
-          window.removeEventListener('pointermove', move);
-          window.removeEventListener('pointerup', end);
-          window.removeEventListener('pointercancel', end);
+window.removeEventListener('pointermove', move);
+window.removeEventListener('pointerup', end);
+window.removeEventListener('pointercancel', end);
+window.removeEventListener('touchmove', move);
+window.removeEventListener('touchend', end);
+window.removeEventListener('touchcancel', end);
           pushHistory('Items moved');
           scheduleAutosave();
           refreshLayersPanel();
         }
-        window.addEventListener('pointermove', move, { passive:false });
-        window.addEventListener('pointerup', end);
-        window.addEventListener('pointercancel', end);
+window.addEventListener('pointermove', move, { passive:false });
+window.addEventListener('pointerup', end);
+window.addEventListener('pointercancel', end);
+window.addEventListener('touchmove', move, { passive:false });
+window.addEventListener('touchend', end);
+window.addEventListener('touchcancel', end);
       }
-      shell.addEventListener('pointerdown', e=>{
+function handleShellStart(e){
         const hardBlocked = e.target.closest('.resizeHandle,.rotateHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink');
         const liveInteractive = appMode==='live' && e.target.closest('.widgetMiniBtn,.widgetActionBtn,.questionOptionBtn,.mediaFrame,.mediaVideo,.mediaOpenLink');
         if(hardBlocked) return;
@@ -2857,7 +2863,7 @@ function setAppMode(mode){
         function end(){ if(isOverBin(draggedItem)){ movingItems.forEach(it=>it.remove()); deselectItem(); } cloneBin.classList.remove('active'); draggedItem.removeEventListener('pointermove',move); draggedItem.removeEventListener('pointerup',end); draggedItem.removeEventListener('pointercancel',end); pushHistory('Items moved'); scheduleAutosave(); refreshLayersPanel(); }
         draggedItem.addEventListener('pointermove',move); draggedItem.addEventListener('pointerup',end); draggedItem.addEventListener('pointercancel',end);
       }
-      shell.addEventListener('pointerdown', e=>{
+vfunction handleShellStart(e){
         const hardBlocked = e.target.closest('.resizeHandle,.rotateHandle,.moveHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink');
         const buildTouchDrag = appMode==='build';
         const liveInteractive = appMode==='live' && e.target.closest('.widgetMiniBtn,.widgetActionBtn,.questionOptionBtn,.mediaFrame,.mediaVideo,.mediaOpenLink');
@@ -2871,7 +2877,9 @@ function setAppMode(mode){
           e.preventDefault();
           startItemDrag(e,item);
         }
-      });
+      }
+shell.addEventListener('pointerdown', handleShellStart);
+shell.addEventListener('touchstart', handleShellStart, { passive:false });
       shell.addEventListener('dblclick', e=>{ e.stopPropagation(); if(item.dataset.type==='question') openQuestionEditorForItem(item); if(item.dataset.type==='text') item.querySelector('.textBoxArea')?.focus(); });
 
       item.querySelectorAll('.resizeHandle').forEach(handle=>{ handle.addEventListener('pointerdown', e=>{ if(item.dataset.locked==='true') return; e.stopPropagation(); e.preventDefault(); selectItem(item); const startX=e.clientX,startY=e.clientY,startWidth=getItemWidth(item),startRotation=parseFloat(item.dataset.rotation||'0'); const signX=handle.classList.contains('nw')||handle.classList.contains('sw')?-1:1; const signY=handle.classList.contains('nw')||handle.classList.contains('ne')?-1:1; const factor=(signX+signY)/2||1; handle.setPointerCapture(e.pointerId); function move(ev){ const dx=ev.clientX-startX, dy=ev.clientY-startY; let delta=(dx*signX+dy*signY)*0.8*factor; let newW=Math.max(60,startWidth+delta); if(snapEnabled) newW=snapValue(newW); item.dataset.width=String(newW); item.dataset.rotation=String(startRotation); applyItemBox(item); repositionFloatingToolbar(); updatePropertiesPanelPosition(); updateSpotlight(); } function end(){ handle.removeEventListener('pointermove',move); handle.removeEventListener('pointerup',end); handle.removeEventListener('pointercancel',end); pushHistory('Item resized'); scheduleAutosave(); refreshLayersPanel(); } handle.addEventListener('pointermove',move); handle.addEventListener('pointerup',end); handle.addEventListener('pointercancel',end); }); });
