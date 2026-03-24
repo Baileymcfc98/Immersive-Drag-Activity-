@@ -1242,7 +1242,8 @@ const starts = movingItems.map(it=>({it,left:parseFloat(it.style.left),top:parse
 const start=getPoint(e);
 const startX=start.clientX, startY=start.clientY;
 if (e.pointerId != null) draggedItem.setPointerCapture(e.pointerId);
-function move(ev)const point=getPoint(ev);
+function move(ev){
+const point=getPoint(ev);
 const dx=point.clientX-startX, dy=point.clientY-startY;
 starts.forEach(({it,left,top})=>{
   let x=left+dx, y=top+dy;
