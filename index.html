@@ -1260,6 +1260,21 @@ e.preventDefault();
 startItemDrag(e,item);
 }
 });
+shell.addEventListener('touchstart', e=>{
+const hardBlocked = e.target.closest('.resizeHandle,.rotateHandle,.moveHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink');
+const buildTouchDrag = appMode==='build';
+const liveInteractive = appMode==='live' && e.target.closest('.widgetMiniBtn,.widgetActionBtn,.questionOptionBtn,.mediaFrame,.mediaVideo,.mediaOpenLink');
+if(hardBlocked) return;
+if(liveInteractive) return;
+if(item.dataset.locked==='true') return;
+if(currentTool!=='move') return;
+selectItem(item);
+if(buildTouchDrag){
+e.preventDefault();
+startItemDrag(e,item);
+}
+},{ passive:false });
+        
 shell.addEventListener('dblclick', e=>{ e.stopPropagation(); if(item.dataset.type==='question') openQuestionEditorForItem(item); if(item.dataset.type==='text') item.querySelector('.textBoxArea')?.focus(); });
 
 item.querySelectorAll('.resizeHandle').forEach(handle=>{ handle.addEventListener('pointerdown', e=>{ if(item.dataset.locked==='true') return; e.stopPropagation(); e.preventDefault(); selectItem(item); const startX=e.clientX,startY=e.clientY,startWidth=getItemWidth(item),startRotation=parseFloat(item.dataset.rotation||'0'); const signX=handle.classList.contains('nw')||handle.classList.contains('sw')?-1:1; const signY=handle.classList.contains('nw')||handle.classList.contains('ne')?-1:1; const factor=(signX+signY)/2||1; handle.setPointerCapture(e.pointerId); function move(ev){ const dx=ev.clientX-startX, dy=ev.clientY-startY; let delta=(dx*signX+dy*signY)*0.8*factor; let newW=Math.max(60,startWidth+delta); if(snapEnabled) newW=snapValue(newW); item.dataset.width=String(newW); item.dataset.rotation=String(startRotation); applyItemBox(item); repositionFloatingToolbar(); updatePropertiesPanelPosition(); updateSpotlight(); } function end(){ handle.removeEventListener('pointermove',move); handle.removeEventListener('pointerup',end); handle.removeEventListener('pointercancel',end); pushHistory('Item resized'); scheduleAutosave(); refreshLayersPanel(); } handle.addEventListener('pointermove',move); handle.addEventListener('pointerup',end); handle.addEventListener('pointercancel',end); }); });
