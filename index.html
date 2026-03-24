@@ -1263,27 +1263,26 @@ function end(){
     deselectItem();
   }
   cloneBin.classList.remove('active');
-  draggedItem.removeEventListener('pointermove',move);
-  draggedItem.removeEventListener('pointerup',end);
-  draggedItem.removeEventListener('pointercancel',end);
-  draggedItem.removeEventListener('touchmove',move);
-  draggedItem.removeEventListener('touchend',end);
-  draggedItem.removeEventListener('touchcancel',end);
+  window.removeEventListener('pointermove',move);
+  window.removeEventListener('pointerup',end);
+  window.removeEventListener('pointercancel',end);
+  window.removeEventListener('touchmove',move);
+  window.removeEventListener('touchend',end);
+  window.removeEventListener('touchcancel',end);
   pushHistory('Items moved');
   scheduleAutosave();
   refreshLayersPanel();
 }
 
-draggedItem.addEventListener('pointermove',move);
-draggedItem.addEventListener('pointerup',end);
-draggedItem.addEventListener('pointercancel',end);
-draggedItem.addEventListener('touchmove',move,{ passive:false });
-draggedItem.addEventListener('touchend',end);
-draggedItem.addEventListener('touchcancel',end);
+window.addEventListener('pointermove',move,{ passive:false });
+window.addEventListener('pointerup',end);
+window.addEventListener('pointercancel',end);
+window.addEventListener('touchmove',move,{ passive:false });
+window.addEventListener('touchend',end);
+window.addEventListener('touchcancel',end);
 }
       moveHandle?.addEventListener('pointerdown', e=>{ e.stopPropagation(); e.preventDefault(); startItemDrag(e,item); });
-shell.addEventListener('pointerdown', e=>{
-const hardBlocked = e.target.closest('.resizeHandle,.rotateHandle,.moveHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink');
+shell.addEventListener('pointerdown', e=>{ const hardBlocked = e.target.closest('.resizeHandle,.rotateHandle,.moveHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink');
 const buildTouchDrag = appMode==='build';
 const liveInteractive = appMode==='live' && e.target.closest('.widgetMiniBtn,.widgetActionBtn,.questionOptionBtn,.mediaFrame,.mediaVideo,.mediaOpenLink');
 if(hardBlocked) return;
@@ -1296,7 +1295,7 @@ if(buildTouchDrag){
 e.preventDefault();
 startItemDrag(e,item);
 }
-});
+})
 shell.addEventListener('touchstart', e=>{
 const hardBlocked = e.target.closest('.resizeHandle,.rotateHandle,.moveHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink');
 const buildTouchDrag = appMode==='build';
