@@ -1223,42 +1223,234 @@ function layoutFolderItems(){ if(sidebarCollapsed){ hideLibraryVisuals(); return
 function layoutWidgetMasters(){ if(sidebarCollapsed){ hideLibraryVisuals(); return; } const show=widgetsOpen&&activeFolder==='widgets'&&!presentationMode; [timerMaster,scoreboardMaster,hotspotToolMaster,textToolMaster,mediaToolMaster].forEach(el=>el.style.display=show?'block':'none'); if(!show) return; [['slot-widget-timer',timerMaster],['slot-widget-scoreboard',scoreboardMaster],['slot-widget-hotspot-tool',hotspotToolMaster],['slot-widget-text-tool',textToolMaster],['slot-widget-media-tool',mediaToolMaster]].forEach(([slotId,el])=>{ const pos=getWidgetSlotPosition(slotId,el); el.style.left=pos.x+'px'; el.style.top=pos.y+'px'; }); }
 
 function wireItemInteractions(item){
-const shell=item.querySelector('.dragShell');
-const moveHandle=item.querySelector('.moveHandle');
 
-function getPoint(ev){
-const p=(ev.touches&&ev.touches[0])||(ev.changedTouches&&ev.changedTouches[0])||ev;
-return { clientX:p.clientX, clientY:p.clientY };
+  function startDraggingElement(draggedItem, e, offsetX, offsetY){
+    if (draggedItem.dataset.locked === 'true') return;
+    if (currentTool !== 'move') return;
+
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    selectItem(draggedItem, additive);
+
+    const movingItems =
+      selectedItems.size > 1 && selectedItems.has(draggedItem)
+        ? Array.from(selectedItems)
+        : [draggedItem];
+
+    const starts = movingItems.map(it => ({
+      it,
+      left: parseFloat(it.style.left),
+      top: parseFloat(it.style.top)
+    }));
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    try {
+      if (e.pointerId != null) draggedItem.setPointerCapture(e.pointerId);
+    } catch {}
+
+    function move(ev){
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+
+      starts.forEach(({ it, left, top }) => {
+        let x = left + dx;
+        let y = top + dy;
+
+        if (snapEnabled) {
+          x = snapValue(x);
+          y = snapValue(y);
+        }
+
+        it.style.left = x + 'px';
+        it.style.top = y + 'px';
+      });
+
+      repositionFloatingToolbar();
+      updatePropertiesPanelPosition();
+      updateSpotlight();
+      cloneBin.classList.toggle('active', isOverBin(draggedItem));
+    }
+
+    function end(){
+      if (isOverBin(draggedItem)) {
+        movingItems.forEach(it => it.remove());
+        deselectItem();
+      }
+
+      cloneBin.classList.remove('active');
+
+      draggedItem.removeEventListener('pointermove', move);
+      draggedItem.removeEventListener('pointerup', end);
+      draggedItem.removeEventListener('pointercancel', end);
+
+      pushHistory('Items moved');
+      scheduleAutosave();
+      refreshLayersPanel();
+    }
+
+    draggedItem.addEventListener('pointermove', move);
+    draggedItem.addEventListener('pointerup', end);
+    draggedItem.addEventListener('pointercancel', end);
+  }
+
+  item.addEventListener('pointerdown', e => {
+    const blocked = e.target.closest(
+      '.resizeHandle,.rotateHandle,.mediaUrlInput,.mediaPosterInput,.textBoxArea,.mediaOpenLink'
+    );
+
+    const liveInteractive =
+      appMode === 'live' &&
+      e.target.closest(
+        '.widgetMiniBtn,.widgetActionBtn,.questionOptionBtn,.mediaFrame,.mediaVideo,.mediaOpenLink'
+      );
+
+    if (blocked) return;
+    if (liveInteractive) return;
+    if (item.dataset.locked === 'true') return;
+    if (currentTool !== 'move') return;
+
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      selectItem(item, true);
+      e.preventDefault();
+      return;
+    }
+
+    if (appMode === 'build') {
+      const rect = item.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+
+      selectItem(item);
+      e.preventDefault();
+      startDraggingElement(item, e, offsetX, offsetY);
+    } else {
+      selectItem(item);
+    }
+  });
+
+  item.addEventListener('dblclick', e => {
+    e.stopPropagation();
+
+    if (item.dataset.type === 'question') {
+      openQuestionEditorForItem(item);
+    }
+
+    if (item.dataset.type === 'text') {
+      item.querySelector('.textBoxArea')?.focus();
+    }
+  });
+
+  item.querySelectorAll('.resizeHandle').forEach(handle => {
+    handle.addEventListener('pointerdown', e => {
+      if (item.dataset.locked === 'true') return;
+
+      e.stopPropagation();
+      e.preventDefault();
+      selectItem(item);
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startWidth = getItemWidth(item);
+      const startRotation = parseFloat(item.dataset.rotation || '0');
+
+      const signX =
+        handle.classList.contains('nw') || handle.classList.contains('sw')
+          ? -1
+          : 1;
+
+      const signY =
+        handle.classList.contains('nw') || handle.classList.contains('ne')
+          ? -1
+          : 1;
+
+      const factor = (signX + signY) / 2 || 1;
+
+      handle.setPointerCapture(e.pointerId);
+
+      function move(ev){
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+
+        let delta = (dx * signX + dy * signY) * 0.8 * factor;
+        let newW = Math.max(60, startWidth + delta);
+
+        if (snapEnabled) newW = snapValue(newW);
+
+        item.dataset.width = String(newW);
+        item.dataset.rotation = String(startRotation);
+        applyItemBox(item);
+        repositionFloatingToolbar();
+        updatePropertiesPanelPosition();
+        updateSpotlight();
+      }
+
+      function end(){
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', end);
+        handle.removeEventListener('pointercancel', end);
+        pushHistory('Item resized');
+        scheduleAutosave();
+        refreshLayersPanel();
+      }
+
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', end);
+      handle.addEventListener('pointercancel', end);
+    });
+  });
+
+  const rotateHandle = item.querySelector('.rotateHandle');
+
+  rotateHandle?.addEventListener('pointerdown', e => {
+    if (item.dataset.locked === 'true') return;
+
+    e.stopPropagation();
+    e.preventDefault();
+    selectItem(item);
+
+    const rect = item.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    rotateHandle.setPointerCapture(e.pointerId);
+
+    function move(ev){
+      let angle =
+        Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI + 90;
+
+      if (snapEnabled) angle = Math.round(angle / 15) * 15;
+
+      item.dataset.rotation = String(angle);
+      applyItemBox(item);
+      repositionFloatingToolbar();
+      updatePropertiesPanelPosition();
+      updateSpotlight();
+    }
+
+    function end(){
+      rotateHandle.removeEventListener('pointermove', move);
+      rotateHandle.removeEventListener('pointerup', end);
+      rotateHandle.removeEventListener('pointercancel', end);
+      pushHistory('Item rotated');
+      scheduleAutosave();
+    }
+
+    rotateHandle.addEventListener('pointermove', move);
+    rotateHandle.addEventListener('pointerup', end);
+    rotateHandle.addEventListener('pointercancel', end);
+  });
+
+  if (item.dataset.type === 'text') {
+    item.querySelector('.textBoxArea')?.addEventListener('input', () => {
+      item.dataset.name =
+        item.querySelector('.textBoxArea').value.trim().slice(0, 20) || 'Text';
+      updateSelectionStatus();
+      refreshLayersPanel();
+      scheduleAutosave();
+    });
+  }
 }
-
-function startItemDrag(e, draggedItem){
-if (draggedItem.dataset.locked === 'true') return;
-if (currentTool !== 'move') return;
-const additive = e.shiftKey || e.metaKey || e.ctrlKey;
-selectItem(draggedItem, additive);
-const stageRect=stage.getBoundingClientRect();
-const movingItems = selectedItems.size > 1 && selectedItems.has(draggedItem) ? Array.from(selectedItems) : [draggedItem];
-const starts = movingItems.map(it=>({it,left:parseFloat(it.style.left),top:parseFloat(it.style.top)}));
-const start=getPoint(e);
-const startX=start.clientX, startY=start.clientY;
-if (e.pointerId != null) draggedItem.setPointerCapture(e.pointerId);
-function move(ev){
-const point=getPoint(ev);
-const dx=point.clientX-startX, dy=point.clientY-startY;
-starts.forEach(({it,left,top})=>{
-  let x=left+dx, y=top+dy;
-  if(snapEnabled){ x=snapValue(x); y=snapValue(y); }
-  it.style.left=x+'px';
-  it.style.top=y+'px';
-});
-repositionFloatingToolbar();
-updatePropertiesPanelPosition();
-updateSpotlight();
-cloneBin.classList.toggle('active', isOverBin(draggedItem));
-}
-
-function end(){
-  if(isOverBin(draggedItem)){
     movingItems.forEach(it=>it.remove());
     deselectItem();
   }
